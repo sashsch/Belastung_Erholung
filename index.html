@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Belastung & Erholung – Tracker (PWA)</title>
+  <meta name="theme-color" content="#0ea5e9" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <style>
+    :root{
+      --accent:#0ea5e9; --bg:#0b1220; --card:#0f172a; --ink:#e5e7eb; --muted:#94a3b8; --ok:#10b981; --warn:#f59e0b;
+    }
+    html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif}
+    header{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,var(--bg),rgba(11,18,32,.6));backdrop-filter:saturate(1.2) blur(6px);padding:12px 16px;border-bottom:1px solid #1f2937}
+    h1{margin:0;font-size:18px;letter-spacing:.3px}
+    .wrap{max-width:980px;margin:0 auto;padding:16px}
+    .grid{display:grid;gap:12px}
+    @media(min-width:900px){.grid-cols-2{grid-template-columns:1fr 1fr}}
+    .card{background:var(--card);border:1px solid #1f2937;border-radius:14px;padding:14px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px}
+    input,select,textarea,button{width:100%;padding:10px;border-radius:10px;border:1px solid #233046;background:#0b1220;color:var(--ink)}
+    input[type="range"]{padding:0}
+    textarea{min-height:66px;resize:vertical}
+    .btn{background:var(--accent);border:none;color:white;font-weight:600;cursor:pointer}
+    .btn-ghost{background:#0b1220;border:1px solid #233046;color:var(--ink)}
+    .btn-danger{background:#ef4444;border:none}
+    .pill{display:inline-flex;align-items:center;gap:8px;background:#0c1222;border:1px solid #233046;border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted)}
+    .mt{margin-top:10px}
+    .tiny{font-size:12px;color:var(--muted)}
+    .ok{color:var(--ok)} .warn{color:var(--warn)}
+    canvas{background:#0b1220;border:1px solid #233046;border-radius:12px}
+    .footer{opacity:.7;font-size:12px;margin-top:18px}
+    table{border-collapse:collapse;width:100%}
+    th,td{padding:6px 8px;border-top:1px solid #233046;font-size:12px}
+    th{text-align:left;color:var(--muted);font-weight:600}
+  </style>
+</head>
+<body>
+<header>
+  <h1>Belastung &amp; Erholung – Tracker</h1>
+  <div class="tiny">Offline nutzbar · Zum Homescreen hinzufuegen</div>
+</header>
+
+<div class="wrap grid grid-cols-2">
+  <section class="card">
+    <h2 style="margin:4px 0 10px 0;font-size:16px">Erfassung</h2>
+    <div class="row">
+      <div>
+        <label>Woche (ISO, z.B. 2025-45)</label>
+        <input id="week" type="text" placeholder="YYYY-WW" />
+      </div>
+      <div>
+        <label>Tag</label>
+        <select id="day">
+          <option>Montag</option><option>Dienstag</option><option>Mittwoch</option>
+          <option>Donnerstag</option><option>Freitag</option><option>Samstag</option><option>Sonntag</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Tageszeit</label>
+        <select id="slot">
+          <option>Morgen</option><option>Mittag</option><option>Nachmittag</option><option>Abend</option>
+        </select>
+      </div>
+      <div>
+        <label>Beschreibung (Taetigkeit)</label>
+        <select id="context">
+          <option>Training</option><option>Arbeit</option><option>Schule/Uni</option>
+          <option>Wettkampf</option><option>Reise/Pendel</option><option>Regeneration/Erholung</option>
+          <option>Sonstiges</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Koerperliche Belastung (0–10)</label>
+        <input id="loadPhysical" type="range" min="0" max="10" value="0" oninput="phVal.textContent=this.value" />
+        <div class="tiny">Wert: <span id="phVal">0</span></div>
+      </div>
+      <div>
+        <label>Mentale Belastung (0–10)</label>
+        <input id="loadMental" type="range" min="0" max="10" value="0" oninput="meVal.textContent=this.value" />
+        <div class="tiny">Wert: <span id="meVal">0</span></div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Fokus/Konzentrationsfaehigkeit (1–5)</label>
+        <input id="focus" type="range" min="1" max="5" value="3" oninput="foVal.textContent=this.value" />
+        <div class="tiny">Wert: <span id="foVal">3</span></div>
+      </div>
+      <div>
+        <label>Notiz (kurz)</label>
+        <input id="note" type="text" placeholder="kurze Notiz" />
+      </div>
+    </div>
+
+    <h3 class="mt" style="font-size:14px;margin-bottom:6px">Erholungstaetigkeiten (max. 2 pro Messzeitpunkt)</h3>
+    <div class="row">
+      <div>
+        <label>Erholung 1 – Art</label>
+        <input id="rec1" type="text" placeholder="z.B. Spaziergang, Musik" />
+      </div>
+      <div>
+        <label>Erholung 1 – Dauer (Min.)</label>
+        <input id="rec1dur" type="number" min="0" step="5" placeholder="0" />
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Erholung 2 – Art</label>
+        <input id="rec2" type="text" placeholder="optional" />
+      </div>
+      <div>
+        <label>Erholung 2 – Dauer (Min.)</label>
+        <input id="rec2dur" type="number" min="0" step="5" placeholder="0" />
+      </div>
+    </div>
+
+    <h3 class="mt" style="font-size:14px;margin-bottom:6px">Schlaf (typisch morgens erfasst)</h3>
+    <div class="row">
+      <div>
+        <label>Schlafdauer (Stunden)</label>
+        <input id="sleepDur" type="number" min="0" max="14" step="0.25" placeholder="7.5" />
+      </div>
+      <div>
+        <label>Schlafqualitaet (1–5)</label>
+        <select id="sleepQual">
+          <option value="">—</option>
+          <option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row mt">
+      <button class="btn" onclick="saveEntry()">Eintrag speichern</button>
+      <button class="btn-ghost" onclick="resetForm()">Maske leeren</button>
+    </div>
+
+    <div class="mt tiny">Tipp: Woche passend waehlen (z.B. <code>2025-45</code>). Alles wird lokal (localStorage) gespeichert.</div>
+  </section>
+
+  <section class="card">
+    <h2 style="margin:4px 0 10px 0;font-size:16px">Eintraege &amp; Export</h2>
+    <div class="row">
+      <div>
+        <label>Gefilterte Woche</label>
+        <input id="filterWeek" type="text" placeholder="YYYY-WW" oninput="renderTable()" />
+      </div>
+      <div>
+        <label>Aktionen</label>
+        <div class="row">
+          <button class="btn-ghost" onclick="exportCSV()">Export CSV</button>
+          <button class="btn-ghost" onclick="document.getElementById('csvFile').click()">Import CSV</button>
+        </div>
+        <input id="csvFile" type="file" accept=".csv,text/csv" style="display:none" onchange="importCSV(this.files[0])" />
+      </div>
+    </div>
+    <div class="mt" id="entries"></div>
+    <div class="mt">
+      <button class="btn-danger" onclick="wipeWeek()">Woche loeschen</button>
+    </div>
+    <div class="footer">CSV kann in Excel geoeffnet/weiterverarbeitet werden.</div>
+  </section>
+
+  <section class="card" style="grid-column:1 / -1">
+    <h2 style="margin:4px 0 10px 0;font-size:16px">Auswertungen (Woche)</h2>
+    <div class="row">
+      <div>
+        <label>Woche</label>
+        <input id="statsWeek" type="text" placeholder="YYYY-WW" oninput="updateCharts()" />
+      </div>
+      <div class="pill">
+        <span>Legende:</span>
+        <span class="ok">Linie: Fokus</span>
+        <span>·</span>
+        <span>Balken: Belastungen</span>
+      </div>
+    </div>
+
+    <div class="mt">
+      <label>Durchschnittliche Belastung je Tageszeit</label>
+      <canvas id="chartSlots" height="220"></canvas>
+    </div>
+    <div class="mt">
+      <label>Fokus im Wochenverlauf (1–5)</label>
+      <canvas id="chartFocus" height="220"></canvas>
+    </div>
+    <div class="mt">
+      <label>Erholungstaetigkeiten (Anteile)</label>
+      <canvas id="chartRecovery" height="220"></canvas>
+    </div>
+
+    <div class="mt card" style="margin-top:16px">
+      <h2 style="margin:4px 0 10px 0;font-size:16px">Wochenvergleich</h2>
+      <div class="row">
+        <div>
+          <label>Woche A</label>
+          <input id="cmpWeekA" type="text" placeholder="YYYY-WW" oninput="updateCompareCharts()" />
+        </div>
+        <div>
+          <label>Woche B</label>
+          <input id="cmpWeekB" type="text" placeholder="YYYY-WW" oninput="updateCompareCharts()" />
+        </div>
+      </div>
+      <div class="mt tiny">Balken zeigen Ø Belastungen (0–10) je Tageszeit. Gruppen = Woche A/B, Farben = koerperlich/mental.</div>
+      <div class="mt">
+        <label>Ø Koerperliche & Mentale Belastung je Tageszeit – Vergleich</label>
+        <canvas id="chartCompareSlots" height="240"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 style="margin:4px 0 10px 0;font-size:16px">Hinweise</h2>
+    <ul class="tiny" style="line-height:1.6">
+      <li>Erfasse pro Messzeitpunkt: <strong>Koerperliche</strong> &amp; <strong>Mentale</strong> Belastung, <strong>Fokus</strong>, bis zu <strong>2 Erholungen</strong> (Art &amp; Dauer), <strong>Taetigkeitsbeschreibung</strong> und kurze Notiz.</li>
+      <li><strong>Schlaf</strong> (Dauer/Qualitaet) kannst du bei der Morgen-Messung eintragen; es wird woechentlich ausgewertet.</li>
+      <li>Alles bleibt lokal auf deinem Geraet (kein Login). Fuer Backup: <strong>CSV exportieren</strong>.</li>
+      <li>Als <strong>PWA</strong> installierbar (Teilen ▸ „Zum Home-Bildschirm“ o.ae.).</li>
+    </ul>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+const KEY = "mentallin_belastung_v1";
+function getAll(){ try{ return JSON.parse(localStorage.getItem(KEY)) || []; }catch(e){ return []; } }
+function setAll(arr){ localStorage.setItem(KEY, JSON.stringify(arr)); }
+function v(id){ return document.getElementById(id).value; }
+function num(id){ return parseFloat(document.getElementById(id).value)||0; }
+function byId(id){ return document.getElementById(id); }
+
+function saveEntry(){
+  const e = {
+    week: v("week").trim(),
+    day: v("day"),
+    slot: v("slot"),
+    context: v("context"),
+    loadPhysical: num("loadPhysical"),
+    loadMental: num("loadMental"),
+    focus: num("focus"),
+    note: v("note").trim(),
+    rec1: v("rec1").trim(), rec1dur: num("rec1dur"),
+    rec2: v("rec2").trim(), rec2dur: num("rec2dur"),
+    sleepDur: v("sleepDur")===""? null : parseFloat(v("sleepDur")),
+    sleepQual: v("sleepQual")===""? null : parseInt(v("sleepQual")),
+    ts: Date.now()
+  };
+  if(!e.week){ alert("Bitte Woche angeben (Format YYYY-WW)."); return; }
+  const all = getAll(); all.push(e); setAll(all);
+  renderTable(); updateCharts(); updateCompareCharts();
+  alert("Eintrag gespeichert.");
+}
+
+function wipeWeek(){
+  const w = byId("filterWeek").value.trim();
+  if(!w){ alert("Bitte zuerst eine Woche im Filter angeben."); return; }
+  if(!confirm("Wirklich alle Eintraege der Woche "+w+" loeschen?")) return;
+  const kept = getAll().filter(x => x.week !== w);
+  setAll(kept); renderTable(); updateCharts(); updateCompareCharts();
+}
+
+function resetForm(){
+  ["context","note","rec1","rec2","rec1dur","rec2dur","sleepDur"].forEach(id=>byId(id).value="");
+  byId("sleepQual").value="3"; byId("loadPhysical").value=0; phVal.textContent=0;
+  byId("loadMental").value=0; meVal.textContent=0; byId("focus").value=3; foVal.textContent=3;
+}
+
+function renderTable(){
+  const w = byId("filterWeek").value.trim();
+  const rows = getAll().filter(x => !w || x.week===w).sort((a,b)=>a.ts-b.ts);
+  const el = byId("entries");
+  if(!rows.length){ el.innerHTML = '<div class="tiny">Keine Eintraege gefunden.</div>'; return; }
+  let html = '<div class="tiny" style="margin-bottom:8px">'+rows.length+' Eintraege</div>';
+  html += `<table>
+    <thead>
+      <tr>
+        <th>Woche</th><th>Tag</th><th>Slot</th><th>Kontext</th>
+        <th>phys</th><th>mental</th><th>Fokus</th>
+        <th>Erh1</th><th>Dauer</th><th>Erh2</th><th>Dauer</th>
+        <th>Schlaf h</th><th>Qual</th><th>Notiz</th>
+      </tr>
+    </thead><tbody>`;
+  for(const r of rows){
+    html += `<tr>
+      <td>${esc(r.week)}</td><td>${esc(r.day)}</td><td>${esc(r.slot)}</td><td>${esc(r.context)}</td>
+      <td>${r.loadPhysical}</td><td>${r.loadMental}</td><td>${r.focus}</td>
+      <td>${esc(r.rec1)}</td><td>${r.rec1dur||""}</td><td>${esc(r.rec2)}</td><td>${r.rec2dur||""}</td>
+      <td>${r.sleepDur??""}</td><td>${r.sleepQual??""}</td><td>${esc(r.note)}</td>
+    </tr>`;
+  }
+  html += "</tbody></table>";
+  el.innerHTML = html;
+}
+function esc(s){ return (s??"").toString().replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
+
+function exportCSV(){
+  const w = byId("filterWeek").value.trim();
+  const rows = getAll().filter(x => !w || x.week===w).sort((a,b)=>a.ts-b.ts);
+  if(!rows.length){ alert("Keine Eintraege fuer Export."); return; }
+  const header = ["week","day","slot","context","loadPhysical","loadMental","focus","note","rec1","rec1dur","rec2","rec2dur","sleepDur","sleepQual","ts"];
+  const lines = [header.join(",")];
+  for(const r of rows){
+    const vals = header.map(k => {
+      let v = r[k]; if(v===undefined || v===null) v="";
+      v = v.toString().replace(/"/g,'""');
+      return /,|\n|"/.test(v) ? `"${v}"` : v;
+    });
+    lines.push(vals.join(","));
+  }
+  const blob = new Blob([lines.join("\n")], {type:"text/csv;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = (w?`Belastung_${w}`:"Belastung_Alle")+".csv";
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+function importCSV(file){
+  const reader = new FileReader();
+  reader.onload = () => {
+    const text = reader.result;
+    const rows = parseCSV(text);
+    if(!rows.length){ alert("CSV leer oder unlesbar."); return; }
+    const all = getAll();
+    for(const r of rows){ all.push(r); }
+    setAll(all); renderTable(); updateCharts(); updateCompareCharts();
+    alert(rows.length+" Eintraege importiert.");
+  };
+  reader.readAsText(file);
+}
+function parseCSV(text){
+  const lines = text.split(/\r?\n/).filter(x=>x.trim().length);
+  if(!lines.length) return [];
+  const header = splitCSVLine(lines[0]); const out=[];
+  for(let i=1;i<lines.length;i++){
+    const cols = splitCSVLine(lines[i]); const obj={};
+    header.forEach((h,idx)=>obj[h]=cols[idx]??"");
+    ["loadPhysical","loadMental","focus","rec1dur","rec2dur","sleepDur","sleepQual","ts"].forEach(k=>{
+      if(obj[k]===""){ obj[k]=null; } else { obj[k]=Number(obj[k]); }
+    });
+    out.push(obj);
+  }
+  return out;
+}
+function splitCSVLine(line){
+  const re = /(?:^|,)(?:"([^"]*(?:""[^"]*)*)"|([^",]*))/g; const out=[];
+  line.replace(re,(_,q,u)=>{ out.push((q||u||"").replace(/""/g,'"')); return ""; });
+  return out;
+}
+
+let chartSlots, chartFocus, chartRecovery, chartCompareSlots;
+
+function updateCharts(){
+  const w = byId("statsWeek").value.trim();
+  const rows = getAll().filter(x => !w || x.week===w);
+
+  const slots = ["Morgen","Mittag","Nachmittag","Abend"];
+  const avg = (arr, k) => arr.length? (arr.reduce((s,x)=>s+(x[k]||0),0)/arr.length):0;
+  const physBySlot = slots.map(s => avg(rows.filter(r=>r.slot===s),"loadPhysical"));
+  const mentBySlot = slots.map(s => avg(rows.filter(r=>r.slot===s),"loadMental"));
+
+  const days = ["Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag","Sonntag"];
+  const focusByDay = days.map(d => avg(rows.filter(r=>r.day===d),"focus"));
+
+  const map = {};
+  for(const r of rows){
+    if(r.rec1){ map[r.rec1]=(map[r.rec1]||0)+1; }
+    if(r.rec2){ map[r.rec2]=(map[r.rec2]||0)+1; }
+  }
+  const pairs = Object.entries(map).sort((a,b)=>b[1]-a[1]);
+  const top = pairs.slice(0,8);
+  const rest = pairs.slice(8).reduce((s,[_k,v])=>s+v,0);
+  if(rest>0) top.push(["Weitere",rest]);
+  const recLabels = top.map(x=>x[0]); const recValues = top.map(x=>x[1]);
+
+  const mkBar = (id, data1, data2) => {
+    const ctx = byId(id).getContext("2d"); if(window[id]){ window[id].destroy(); }
+    return new Chart(ctx, {
+      type:"bar",
+      data:{
+        labels: slots,
+        datasets:[
+          { label:"Koerperlich", data:data1 },
+          { label:"Mental", data:data2 }
+        ]
+      },
+      options:{
+        responsive:true,
+        scales:{ y:{ beginAtZero:true, suggestedMax:10 } }
+      }
+    });
+  };
+  const mkLine = (id, labels, data) => {
+    const ctx = byId(id).getContext("2d"); if(window[id]){ window[id].destroy(); }
+    return new Chart(ctx, {
+      type:"line",
+      data:{ labels, datasets:[{ label:"Fokus", data, tension:.25, fill:false }] },
+      options:{ responsive:true, scales:{ y:{ beginAtZero:true, suggestedMax:5 } } }
+    });
+  };
+  const mkPie = (id, labels, data) => {
+    const ctx = byId(id).getContext("2d"); if(window[id]){ window[id].destroy(); }
+    return new Chart(ctx, {
+      type:"pie",
+      data:{ labels, datasets:[{ data }] },
+      options:{ responsive:true }
+    });
+  };
+
+  window.chartSlots = mkBar("chartSlots", physBySlot, mentBySlot);
+  window.chartFocus = mkLine("chartFocus", days, focusByDay);
+  window.chartRecovery = mkPie("chartRecovery", recLabels, recValues);
+}
+
+function updateCompareCharts(){
+  const wA = (byId("cmpWeekA")?.value || "").trim();
+  const wB = (byId("cmpWeekB")?.value || "").trim();
+  const slots = ["Morgen","Mittag","Nachmittag","Abend"];
+  const rows = getAll();
+  const avg = (arr, k) => arr.length ? (arr.reduce((s,x)=>s+(x[k]||0),0)/arr.length) : 0;
+  const forWeek = (w) => rows.filter(r=>!w || r.week===w);
+
+  const A = forWeek(wA), B = forWeek(wB);
+  const physA = slots.map(s => avg(A.filter(r=>r.slot===s),"loadPhysical"));
+  const mentA = slots.map(s => avg(A.filter(r=>r.slot===s),"loadMental"));
+  const physB = slots.map(s => avg(B.filter(r=>r.slot===s),"loadPhysical"));
+  const mentB = slots.map(s => avg(B.filter(r=>r.slot===s),"loadMental"));
+
+  const ctx = byId("chartCompareSlots").getContext("2d");
+  if(chartCompareSlots) chartCompareSlots.destroy();
+  chartCompareSlots = new Chart(ctx, {
+    type:"bar",
+    data:{
+      labels: slots,
+      datasets:[
+        { label:`A ${wA||"(alle)"}, koerp.`, data: physA },
+        { label:`A ${wA||"(alle)"}, mental`, data: mentA },
+        { label:`B ${wB||"(alle)"}, koerp.`, data: physB },
+        { label:`B ${wB||"(alle)"}, mental`, data: mentB }
+      ]
+    },
+    options:{
+      responsive:true,
+      scales:{ y:{ beginAtZero:true, suggestedMax:10 } }
+    }
+  });
+}
+
+function isoWeekToMonday(iso){
+  const [y, w] = (iso||"").split("-").map(x=>parseInt(x,10));
+  if(!y || !w) return null;
+  const jan4 = new Date(Date.UTC(y,0,4));
+  const day = jan4.getUTCDay()||7;
+  const mondayWeek1 = new Date(jan4); mondayWeek1.setUTCDate(jan4.getUTCDate() - (day-1));
+  const mondayTarget = new Date(mondayWeek1); mondayTarget.setUTCDate(mondayWeek1.getUTCDate() + (w-1)*7);
+  return mondayTarget;
+}
+function mondayToIsoWeek(d){
+  const date = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(),0,1));
+  const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1)/7);
+  return `${date.getUTCFullYear()}-${String(weekNo).padStart(2,"0")}`;
+}
+function previousIsoWeek(iso){
+  const mon = isoWeekToMonday(iso); if(!mon) return "";
+  const prev = new Date(mon); prev.setUTCDate(mon.getUTCDate()-7);
+  return mondayToIsoWeek(prev);
+}
+
+window.addEventListener("load", () => {
+  const today = new Date();
+  const isoWeek = (d => {
+    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const dayNum = date.getUTCDay() || 7;
+    date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(),0,1));
+    const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1)/7);
+    return `${date.getFullYear()}-${String(weekNo).padStart(2,"0")}`;
+  })(today);
+
+  byId("week").value = isoWeek;
+  byId("filterWeek").value = isoWeek;
+  byId("statsWeek").value = isoWeek;
+
+  const prevWeek = previousIsoWeek(isoWeek);
+  byId("cmpWeekA").value = isoWeek;
+  byId("cmpWeekB").value = prevWeek;
+
+  renderTable(); updateCharts(); updateCompareCharts();
+
+  if("serviceWorker" in navigator){
+    navigator.serviceWorker.register("sw.js").catch(()=>{});
+  }
+});
+</script>
+</body>
+</html>
